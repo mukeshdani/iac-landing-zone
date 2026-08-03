@@ -1,10 +1,10 @@
 terraform {
-  required_version = ">= 1.5.7" # Specifies minimum supported Terraform CLI version
+  required_version = ">= 1.5.7"
 
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 5.0" # Constrains provider selection to latest major release version 5.x
+      version = "~> 5.0"
     }
   }
 }
