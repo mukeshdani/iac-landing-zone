@@ -5,6 +5,17 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # Allows safe manual trigger via the GitHub Actions UI to run the destroy phase exclusively
+  workflow_dispatch:
+    inputs:
+      destroy_infrastructure:
+        description: "Enforce explicit deletion flag. Set to 'true' to execute teardown."
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: read
@@ -16,6 +27,8 @@ jobs:
   security_scans:
     name: "Security & Lint Analysis"
     runs-on: ubuntu-latest
+    # Bypasses execution when running a manual infrastructure deletion event
+    if: github.event.inputs.destroy_infrastructure != 'true'
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
@@ -54,7 +67,7 @@ jobs:
     name: "Terraform Plan"
     needs: security_scans
     runs-on: ubuntu-latest
-    environment: production # 👈 CRITICAL: Tells GitHub to unlock Environment Secrets for the Plan stage
+    environment: production
     env:
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -68,7 +81,7 @@ jobs:
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: "1.5.7"
-        terraform_wrapper: false # Disables the wrapper to ensure raw environment variables injection
+        terraform_wrapper: false
 
     - name: Terraform Init & Plan (Parent)
       run: |
@@ -82,13 +95,13 @@ jobs:
         name: tfplan
         path: parent/tfplan-parent
 
-    # ==============================================================================
+  # ==============================================================================
   # STAGE 3: INFRASTRUCTURE PIPELINE AUTOMATION - DEPLOYMENT EXECUTION (APPLY)
   # ==============================================================================
   terraform_apply:
     name: "Terraform Apply (Production Deployment)"
     needs: terraform_plan
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.event.inputs.destroy_infrastructure != 'true'
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -117,3 +130,33 @@ jobs:
         cd parent
         terraform init
         terraform apply -auto-approve tfplan-parent
+
+  # ==============================================================================
+  # STAGE 4: INFRASTRUCTURE TEARDOWN AUTOMATION - DESTRUCTION STATE (DESTROY)
+  # ==============================================================================
+  terraform_destroy:
+    name: "Terraform Destroy (Infrastructure Deletion)"
+    # Executes only via direct explicit user UI interaction trigger request
+    if: github.event.inputs.destroy_infrastructure == 'true'
+    runs-on: ubuntu-latest
+    environment: production # Mandatory structural peer review gating mechanism assignment
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.5.7"
+        terraform_wrapper: false
+
+    - name: Terraform Init & Destroy
+      run: |
+        cd parent
+        terraform init
+        terraform destroy -auto-approve
