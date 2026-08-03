@@ -39,10 +39,11 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
 
+    # Updated with explicit config file loading 👇
     - name: Run TFLint
       run: |
-        tflint --init
-        tflint -f compact --recursive
+        tflint --init --config=.tflint.hcl
+        tflint -f compact --recursive --config=.tflint.hcl
 
     # 4. Checkov (Advance Cloud Security Static Analysis)
     - name: Run Checkov Security Scan
