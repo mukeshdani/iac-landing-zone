@@ -7,13 +7,13 @@ on:
     branches: [ main ]
 
 permissions:
-  id-token: write
-  contents: read
+  id-token: write # Required for requesting the JWT token used in OIDC federation
+  contents: read  # Required for checking out the repository code
 
 jobs:
-  # =======================================================
-  # STAGE 1: SECURITY & LINT SCANNING
-  # =======================================================
+  # ==============================================================================
+  # STAGE 1: STATIC CODE ANALYSIS AND SECURITY SCANNING
+  # ==============================================================================
   security_scans:
     name: "Security & Lint Analysis"
     runs-on: ubuntu-latest
@@ -21,19 +21,16 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0 
+        fetch-depth: 0 # Required to enable full commit history scanning for secrets
 
-    # 1. Gitleaks (Secret/Password Detection)
     - name: Run Gitleaks
       uses: gitleaks/gitleaks-action@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # 2. Setup Terraform for Linter
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
 
-    # 3. TFLint (Terraform Best Practices Linter)
     - name: Setup TFLint
       uses: terraform-linters/setup-tflint@v4
       with:
@@ -44,20 +41,19 @@ jobs:
         tflint --init
         tflint -f compact --recursive --disable-rule=terraform_required_version --disable-rule=terraform_required_providers
 
-    # 4. Checkov (Advance Cloud Security Static Analysis)
     - name: Run Checkov Security Scan
       uses: bridgecrewio/checkov-action@master
       with:
         framework: terraform
         output_format: cli
-        soft_fail: true 
+        soft_fail: true # Non-blocking execution enabled to allow pipeline continuity during initial evaluation
 
-  # =======================================================
-  # STAGE 2: TERRAFORM PLAN
-  # =======================================================
+  # ==============================================================================
+  # STAGE 2: INFRASTRUCTURE PIPELINE AUTOMATION - PRE-DEPLOYMENT VALIDATION (PLAN)
+  # ==============================================================================
   terraform_plan:
     name: "Terraform Plan"
-    needs: security_scans 
+    needs: security_scans # Sequential execution dependency enforced
     runs-on: ubuntu-latest
     env:
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -68,12 +64,19 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    - name: Azure Login via OIDC
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: "1.5.7"
 
-    # Plan on Parent Folder
+    # Navigates to the parent root module directory to initialize backend state and compute speculative changes
     - name: Terraform Init & Plan (Parent)
       run: |
         cd parent
@@ -86,15 +89,15 @@ jobs:
         name: tfplan
         path: parent/tfplan-parent
 
-  # =======================================================
-  # STAGE 3: MANUAL APPROVAL & DEPLOY (Sirf Main Branch)
-  # =======================================================
+  # ==============================================================================
+  # STAGE 3: INFRASTRUCTURE PIPELINE AUTOMATION - DEPLOYMENT EXECUTION (APPLY)
+  # ==============================================================================
   terraform_apply:
     name: "Terraform Apply (Production Deployment)"
     needs: terraform_plan
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' # Enforces branch-protection pipeline logic
     runs-on: ubuntu-latest
-    environment: production # GitHub par Manual Approval trigger karega
+    environment: production # Triggers manual approval gating mechanism configured within the GitHub UI
     env:
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -104,10 +107,16 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    - name: Azure Login via OIDC
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
 
-    # Saved plan ko download karna
     - name: Download Plan Artifact
       uses: actions/download-artifact@v4
       with:
