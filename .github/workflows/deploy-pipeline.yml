@@ -82,7 +82,7 @@ jobs:
         name: tfplan
         path: parent/tfplan-parent
 
-  # ==============================================================================
+    # ==============================================================================
   # STAGE 3: INFRASTRUCTURE PIPELINE AUTOMATION - DEPLOYMENT EXECUTION (APPLY)
   # ==============================================================================
   terraform_apply:
@@ -90,7 +90,7 @@ jobs:
     needs: terraform_plan
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: production # Triggers manual approval gating mechanism
+    environment: production
     env:
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -103,6 +103,7 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
+        terraform_version: "1.5.7"
         terraform_wrapper: false
 
     - name: Download Plan Artifact
