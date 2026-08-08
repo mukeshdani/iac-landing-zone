@@ -1,4 +1,4 @@
-name: "Azure Landing Zone DevSecOps Pipeline"
+name: "Azure Landing Zone DevSecOps Pipeline (08-08-2026)"
 
 on:
   push:
@@ -85,7 +85,7 @@ jobs:
 
     - name: Terraform Init & Plan (Parent)
       run: |
-        cd 06-08-2026
+        cd 08-08-2026
         terraform init
         terraform plan -out=tfplan-parent
 
@@ -93,7 +93,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: tfplan
-        path: 06-08-2026/tfplan-parent
+        path: 08-08-2026/tfplan-parent
 
   # ==============================================================================
   # STAGE 3: INFRASTRUCTURE PIPELINE AUTOMATION - DEPLOYMENT EXECUTION (APPLY)
@@ -123,11 +123,11 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: tfplan
-        path: 06-08-2026
+        path: 08-08-2026
 
     - name: Terraform Init & Apply
       run: |
-        cd 06-08-2026
+        cd 08-08-2026
         terraform init
         terraform apply -auto-approve tfplan-parent
 
@@ -157,6 +157,6 @@ jobs:
 
     - name: Terraform Init & Destroy
       run: |
-        cd 06-08-2026
+        cd 08-08-2026
         terraform init
         terraform destroy -auto-approve
