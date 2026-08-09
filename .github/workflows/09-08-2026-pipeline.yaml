@@ -1,0 +1,96 @@
+# Defines the name of this GitHub Actions workflow as it will appear in the GitHub Actions UI
+name: "k8's CI/CD Pipeline (09-08-2026)"
+
+# Specifies the events that will automatically trigger this workflow to run
+on:
+  # Triggers the workflow whenever code is pushed to specific branches
+  push:
+    # Lists the specific branches that will trigger this push event
+    branches:
+      # The workflow will automatically run when code is pushed to the 'main' branch
+      - main
+      # The workflow will automatically run when code is pushed to any branch starting with 'feature/'
+      - 'feature/*'
+  # Would allow the workflow to be manually triggered from the GitHub UI using a button
+  # workflow_dispatch:
+  # Would define custom input parameters for the user to fill out during the manual trigger
+  #   inputs:
+  # Would create an input parameter specifically named 'action'
+  #     action:
+  # Would provide a human-readable description for the 'action' input to help the user
+  #       description: "Choose Action"
+  # Would make it mandatory for the user to provide this input before the workflow can run
+  #       required: true
+  # Would automatically select 'apply' as the default value if the user doesn't change it
+  #       default: "apply"
+  # Would force the user to select from a predefined dropdown list of options
+  #       type: choice
+  # Would list the available choices for the dropdown menu
+  #       options:
+  # Would be the first choice in the dropdown menu
+  #         - "apply"
+  # Would be the second choice in the dropdown menu
+  #         - "destroy"
+
+# Configures the security permissions granted to the default GitHub token used by this workflow
+permissions:
+  # Grants read-only access to the repository's code so the pipeline is allowed to download it
+  contents: read
+
+# Defines environment variables that will be available globally to all jobs in this workflow
+env:
+  # Sets a custom variable named 'TF_WORKING_DIR' to store the path where your Terraform code is located
+  TF_WORKING_DIR: "09-08-2026/Control Plane/environment/prod"
+
+# Defines the actual tasks (jobs) that this workflow will execute
+jobs:
+  # Defines a job with the ID 'scan-state'
+  scan-state:
+    # Sets the human-readable display name for this job in the GitHub UI
+    name: "Scaning"
+    # Specifies that this job should run on a virtual machine using the latest version of Ubuntu Linux
+    runs-on: ubuntu-latest
+    # Ties this job to the 'production' environment in GitHub, unlocking production secrets and rules
+    environment: production
+    # Would prevent the job from running if the user manually selected 'destroy' from the dropdown
+    # if: github.event.inputs.action != 'destroy'
+    # Defines environment variables that are specific only to this 'scan-state' job
+    env:
+      # Injects the Azure Client ID securely from GitHub Secrets into this environment variable
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      # Injects the Azure Client Secret securely from GitHub Secrets into this environment variable
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      # Injects the Azure Tenant ID securely from GitHub Secrets into this environment variable
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      # Injects the Azure Subscription ID securely from GitHub Secrets into this environment variable
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    # Lists the sequence of tasks (steps) that will run one by one inside this job
+    steps:
+      # Sets the display name for the first step
+      - name: Checkout Code
+        # Uses an official GitHub Action (actions/checkout) to download your repository code onto the runner
+        uses: actions/checkout@v4
+
+      # Sets the display name for the security scanning step
+      - name: Security Scan (Checkov)
+        # Uses a third-party Action (checkov-action) created by Bridgecrew to scan the code for security vulnerabilities
+        uses: bridgecrewio/checkov-action@master
+        # Provides configuration settings (inputs) specifically for the Checkov action
+        with:
+          # Tells Checkov that the code it needs to scan is written in Terraform format
+          framework: terraform
+          # Tells Checkov to output the scan results directly into the command-line interface logs
+          output_format: cli
+          # Tells the pipeline to continue running even if Checkov finds security issues (it won't break the build)
+          soft_fail: true
+
+      # Sets the display name for the artifact uploading step
+      - name: Upload Plan Artifact
+        # Uses an official GitHub Action to save files (artifacts) from the runner so you can download them later
+        uses: actions/upload-artifact@v4
+        # Provides configuration settings for the artifact upload action
+        with:
+          # Sets the name of the downloaded zip file to 'tfplan'
+          name: tfplan
+          # Tells the action exactly which file path to upload (in this case, the tfplan file inside your working directory)
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
