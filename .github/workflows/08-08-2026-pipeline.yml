@@ -1,4 +1,4 @@
-name: "Simple CI/CD Pipeline (08-08-2026)"
+name: "CI/CD Pipeline (08-08-2026)"
 
 on:
   push:

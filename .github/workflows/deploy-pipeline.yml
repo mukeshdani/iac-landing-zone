@@ -5,7 +5,6 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # Allows safe manual trigger via the GitHub Actions UI to run the destroy phase exclusively
   workflow_dispatch:
     inputs:
       destroy_infrastructure:
@@ -85,7 +84,7 @@ jobs:
 
     - name: Terraform Init & Plan (Parent)
       run: |
-        cd 06-08-2026
+        cd 06-08-2026/environment/prod
         terraform init
         terraform plan -out=tfplan-parent
 
@@ -93,7 +92,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: tfplan
-        path: 06-08-2026/tfplan-parent
+        path: 06-08-2026/environment/prod/tfplan-parent
 
   # ==============================================================================
   # STAGE 3: INFRASTRUCTURE PIPELINE AUTOMATION - DEPLOYMENT EXECUTION (APPLY)
@@ -123,11 +122,11 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: tfplan
-        path: 06-08-2026
+        path: 06-08-2026/environment/prod
 
     - name: Terraform Init & Apply
       run: |
-        cd 06-08-2026
+        cd 06-08-2026/environment/prod
         terraform init
         terraform apply -auto-approve tfplan-parent
 
@@ -157,6 +156,6 @@ jobs:
 
     - name: Terraform Init & Destroy
       run: |
-        cd 06-08-2026
+        cd 06-08-2026/environment/prod
         terraform init
         terraform destroy -auto-approve

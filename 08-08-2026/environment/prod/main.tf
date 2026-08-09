@@ -3,6 +3,9 @@ module "resource_group" {
   rgs    = { for k, v in var.rgs : k => v if v.create }
 }
 
+
+
+
 module "virtual_network" {
   depends_on = [module.resource_group]
   source     = "../../child/azurerm_virtual_network"
