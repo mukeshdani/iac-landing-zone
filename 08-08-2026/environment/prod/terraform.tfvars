@@ -14,6 +14,11 @@ rgs = {
     location = "West US"
     create   = false
   }
+  rg4 = {
+    name     = "pmd-cicd-rg4"
+    location = "West US"
+    create   = false
+  }
 }
 
 vnet = {
