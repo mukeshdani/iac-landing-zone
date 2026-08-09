@@ -19,4 +19,6 @@ resource "azurerm_kubernetes_cluster" "k8s" {
   identity {
     type = each.value.identity_type
   }
+
+  node_provisioning_profile {}
 }
